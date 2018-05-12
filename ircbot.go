@@ -49,6 +49,7 @@ func main() {
 		con.Privmsg(chanName, "Join Message...")
 	})
 
+	// Add general logging (messages without commands)
 	con.AddCallback("PRIVMSG", func(e *irc.Event) {
 		if containsCommand(supportedCommands, strings.Fields(e.Message())[0]) {
 			switch strings.Fields(e.Message())[0] {
@@ -64,7 +65,6 @@ func main() {
 	con.Loop()
 }
 
-//TODO: Trim command off of saved text
 func addQuote(db *storm.DB, username string, quotedText string, sentAt time.Time) error {
 	dbInsert := Quote{Username: username, QuotedText: quotedText, SentAt: sentAt}
 
@@ -77,15 +77,9 @@ func addQuote(db *storm.DB, username string, quotedText string, sentAt time.Time
 
 func findSingleQuote(db *storm.DB, con *irc.Connection) {
 	var quoteQuery Quote
-	fmt.Println("1")
 
 	quoteCount, err := db.Count(&quoteQuery)
 	if err == nil {
-		fmt.Println("2")
-
-		fmt.Println(quoteCount)
-		fmt.Println(err)
-
 		var randomID = rand.Intn(quoteCount)
 
 		err := db.One("ID", randomID, &quoteQuery)
@@ -94,14 +88,12 @@ func findSingleQuote(db *storm.DB, con *irc.Connection) {
 		} else {
 			fmt.Println(err)
 
-			// Add Date/Time
-			con.Privmsg(chanName, quoteQuery.Username+quoteQuery.QuotedText)
+			con.Privmsg(chanName, "Quote added by: "+quoteQuery.Username+" : "+"On "+quoteQuery.SentAt.Format("01-02-2006")+" ~ "+strings.Join(strings.Fields(quoteQuery.QuotedText)[1:], " "))
 		}
 	}
 }
 
 func containsCommand(s []string, e string) bool {
-	fmt.Println(e)
 	for _, a := range s {
 		if a == e {
 			return true
