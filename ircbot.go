@@ -20,9 +20,16 @@ type Quote struct {
 	SentAt     time.Time
 }
 
+type Weather struct {
+	ID       int    `storm:"id,increment=0"`
+	Username string `storm:"unique"`
+	City     string
+}
+
 var supportedCommands = []string{
 	".quote",
 	".addquote",
+	".weather"
 }
 
 func main() {
@@ -57,7 +64,8 @@ func main() {
 				findSingleQuote(db, con)
 			case ".addquote":
 				addQuote(db, e.Nick, e.Message(), time.Now())
-
+			case ".weather":
+				fetchWeatherForLocation(db, e.Nick, e.Message(),con)
 			}
 		}
 	})
@@ -90,6 +98,17 @@ func findSingleQuote(db *storm.DB, con *irc.Connection) {
 
 			con.Privmsg(chanName, "Quote added by: "+quoteQuery.Username+" : "+"On "+quoteQuery.SentAt.Format("01-02-2006")+" ~ "+strings.Join(strings.Fields(quoteQuery.QuotedText)[1:], " "))
 		}
+	}
+}
+
+func fetchWeatherForLocation(db *storm.DB, username string, message string, con*irc.Connection) string{
+	var weatherQuery Weather
+
+	err := db.One("Username", username, &weatherQuery)
+	if err != nil || weatherQuery.Username == " " {
+		con.Privmsg(chanName,username + " It doesn't look like you have added a location - please add a location with command .weather ~San Francisco~")
+	}else{
+		// Username exists...grab city and pipe into query and return
 	}
 }
 
