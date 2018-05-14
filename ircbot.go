@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math/rand"
+	"net/http"
 	"strings"
 	"time"
 
@@ -29,7 +31,7 @@ type Weather struct {
 var supportedCommands = []string{
 	".quote",
 	".addquote",
-	".weather"
+	".weather",
 }
 
 func main() {
@@ -65,7 +67,7 @@ func main() {
 			case ".addquote":
 				addQuote(db, e.Nick, e.Message(), time.Now())
 			case ".weather":
-				fetchWeatherForLocation(db, e.Nick, e.Message(),con)
+				fetchWeatherForLocation(db, e.Nick, e.Message(), con)
 			}
 		}
 	})
@@ -101,14 +103,38 @@ func findSingleQuote(db *storm.DB, con *irc.Connection) {
 	}
 }
 
-func fetchWeatherForLocation(db *storm.DB, username string, message string, con*irc.Connection) string{
-	var weatherQuery Weather
+func fetchWeatherForLocation(db *storm.DB, username string, message string, con *irc.Connection) {
 
+	var weatherQuery Weather
 	err := db.One("Username", username, &weatherQuery)
-	if err != nil || weatherQuery.Username == " " {
-		con.Privmsg(chanName,username + " It doesn't look like you have added a location - please add a location with command .weather ~San Francisco~")
-	}else{
+
+	if err != nil || weatherQuery.Username == " " || !strings.Contains(message, "~") {
+		con.Privmsg(chanName, username+" It doesn't look like you have configured a location - please add a location with command .weather ~San Francisco~")
+	} else if strings.Contains(message, "~") {
+		// If the user is configuring a location
+		locationString := strings.NewReplacer("~", "", "~", "")
+		weatherConfig := Weather{Username: username, City: locationString.Replace(message)}
+
+		err := db.Save(&weatherConfig)
+		if err != nil {
+			log.Fatal("Failed to save")
+		}
+	} else {
 		// Username exists...grab city and pipe into query and return
+		resp, err := http.Get("wttr.in/~" + weatherQuery.City)
+		if err != nil {
+			log.Fatal("HTTP Error Occured...")
+		}
+
+		defer resp.Body.Close()
+
+		// Possibly deal with Readall err
+		if resp.StatusCode == http.StatusOK {
+			bodyBytes, _ := ioutil.ReadAll(resp.Body)
+			bodyString := string(bodyBytes)
+
+			con.Privmsg(chanName, bodyString)
+		}
 	}
 }
 
