@@ -13,7 +13,7 @@ import (
 	"github.com/thoj/go-ircevent"
 )
 
-var chanName = "#ChannelName"
+var chanName = "#redlight"
 
 type Quote struct {
 	ID         int `storm:"id,increment=0"`
@@ -32,12 +32,13 @@ var supportedCommands = []string{
 	".quote",
 	".addquote",
 	".weather",
+	".addweather",
 }
 
 func main() {
 
 	con := irc.IRC("BotName", "BotName")
-	err := con.Connect("irc.freenode.net:6667")
+	err := con.Connect("irc.crushandrun.net:6667")
 	if err != nil {
 		fmt.Println("Connection Failed")
 		return
@@ -68,6 +69,8 @@ func main() {
 				addQuote(db, e.Nick, e.Message(), time.Now())
 			case ".weather":
 				fetchWeatherForLocation(db, e.Nick, e.Message(), con)
+			case ".addweather":
+				addWeatherLocation(db, e.Nick, e.Message(), con)
 			}
 		}
 	})
@@ -104,26 +107,19 @@ func findSingleQuote(db *storm.DB, con *irc.Connection) {
 }
 
 func fetchWeatherForLocation(db *storm.DB, username string, message string, con *irc.Connection) {
-
 	var weatherQuery Weather
 	err := db.One("Username", username, &weatherQuery)
 
-	if err != nil || weatherQuery.Username == " " || !strings.Contains(message, "~") {
+	if err != nil || weatherQuery.Username == " " {
 		con.Privmsg(chanName, username+" It doesn't look like you have configured a location - please add a location with command .weather ~San Francisco~")
-	} else if strings.Contains(message, "~") {
-		// If the user is configuring a location
-		locationString := strings.NewReplacer("~", "", "~", "")
-		weatherConfig := Weather{Username: username, City: locationString.Replace(message)}
-
-		err := db.Save(&weatherConfig)
-		if err != nil {
-			log.Fatal("Failed to save")
-		}
 	} else {
 		// Username exists...grab city and pipe into query and return
-		resp, err := http.Get("wttr.in/~" + weatherQuery.City)
+
+		resp, err := http.Get("http://wttr.in/~" + weatherQuery.City + "?0TQ")
 		if err != nil {
-			log.Fatal("HTTP Error Occured...")
+			fmt.Println(weatherQuery.City)
+
+			log.Fatal(err.Error())
 		}
 
 		defer resp.Body.Close()
@@ -133,8 +129,23 @@ func fetchWeatherForLocation(db *storm.DB, username string, message string, con 
 			bodyBytes, _ := ioutil.ReadAll(resp.Body)
 			bodyString := string(bodyBytes)
 
-			con.Privmsg(chanName, bodyString)
+			var responseString = getStringBetweenTags(bodyString, "<pre>", "</pre>")
+
+			con.Privmsg(chanName, weatherQuery.Username+" "+"-"+" "+" It Is currently:"+" "+getCurrentWeatherCondition(responseString)+" "+"and"+" "+getCurrentTemp(strings.Fields(responseString))+" "+"in"+" "+weatherQuery.City)
 		}
+	}
+}
+
+func addWeatherLocation(db *storm.DB, username string, message string, con *irc.Connection) {
+	locationString := strings.Split(message, "~")
+	weatherConfig := Weather{Username: username, City: locationString[1]}
+
+	fmt.Println(weatherConfig)
+
+	//Fix this for updates if user already exists
+	err := db.Save(&weatherConfig)
+	if err != nil {
+		log.Fatal("Failed to save")
 	}
 }
 
@@ -145,4 +156,89 @@ func containsCommand(s []string, e string) bool {
 		}
 	}
 	return false
+}
+
+func getStringBetweenTags(str string, startTag string, endTag string) (result string) {
+	s := strings.Index(str, startTag)
+	if s == -1 {
+		return
+	}
+	s += len(startTag)
+	e := strings.Index(str, endTag)
+	return str[s:e]
+}
+
+func getCurrentTemp(str []string) string {
+	var returnedStr = ""
+	var i = 0
+	var stopAt = 0
+	for _, substr := range str {
+		if substr == "°F" {
+			stopAt += i
+			stopAt++
+		}
+		i++
+	}
+	returnedStr = strings.Join(str[6:8], " ")
+
+	return returnedStr
+}
+
+func getCurrentWeatherCondition(str string) (condition string) {
+	// Maybe find unicode/emoji chars and build this []string into a struct of some sort?
+	conditions := []string{"Clear",
+		"Sunny",
+		"Partly cloudy",
+		"Cloudy",
+		"Overcast",
+		"Mist",
+		"Patchy rain possible",
+		"Patchy snow possible",
+		"Patchy sleet possible",
+		"Patchy freezing drizzle possible",
+		"Thundery outbreaks possible",
+		"Blowing snow",
+		"Blizzard",
+		"Fog",
+		"Freezing fog",
+		"Patchy light drizzle",
+		"Light drizzle",
+		"Freezing drizzle",
+		"Heavy freezing drizzle",
+		"Patchy light rain",
+		"Light rain",
+		"Moderate rain at times",
+		"Moderate rain",
+		"Heavy rain at times",
+		"Heavy rain",
+		"Light freezing rain",
+		"Moderate or heavy freezing rain",
+		"Light sleet",
+		"Moderate or heavy sleet",
+		"Patchy light snow",
+		"Light snow",
+		"Patchy moderate snow",
+		"Moderate snow",
+		"Patchy heavy snow",
+		"Heavy snow",
+		"Ice pellets",
+		"Light rain shower",
+		"Moderate or heavy rain shower",
+		"Torrential rain shower",
+		"Light sleet showers",
+		"Light snow showers",
+		"Moderate or heavy sleet showers",
+		"Moderate or heavy snow showers",
+		"Patchy light rain with thunder",
+		"Moderate or heavy rain with thunder",
+		"Patchy light snow with thunder",
+		"Moderate or heavy snow with thunder"}
+
+	var returnedStr = ""
+	for _, substr := range conditions {
+		if strings.Contains(str, substr) {
+			returnedStr += substr
+		}
+	}
+	return returnedStr
 }
