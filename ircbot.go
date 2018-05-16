@@ -131,21 +131,23 @@ func fetchWeatherForLocation(db *storm.DB, username string, message string, con 
 
 			var responseString = getStringBetweenTags(bodyString, "<pre>", "</pre>")
 
-			con.Privmsg(chanName, weatherQuery.Username+" "+"-"+" "+" It Is currently:"+" "+getCurrentWeatherCondition(responseString)+" "+"and"+" "+getCurrentTemp(strings.Fields(responseString))+" "+"in"+" "+weatherQuery.City)
+			con.Privmsg(chanName, weatherQuery.Username+" "+"-"+" "+" It Is currently"+" "+getCurrentWeatherCondition(responseString)+" "+"and"+" "+getCurrentTemp(responseString)+" "+"in"+" "+weatherQuery.City)
 		}
 	}
 }
 
 func addWeatherLocation(db *storm.DB, username string, message string, con *irc.Connection) {
-	locationString := strings.Split(message, "~")
-	weatherConfig := Weather{Username: username, City: locationString[1]}
+	if strings.Contains(message, "~") {
+		locationString := strings.Split(message, "~")
+		weatherConfig := Weather{Username: username, City: locationString[1]}
 
-	fmt.Println(weatherConfig)
+		fmt.Println(weatherConfig)
 
-	//Fix this for updates if user already exists
-	err := db.Save(&weatherConfig)
-	if err != nil {
-		log.Fatal("Failed to save")
+		//Fix this for updates if user already exists
+		err := db.Save(&weatherConfig)
+		if err != nil {
+			log.Fatal("Failed to save")
+		}
 	}
 }
 
@@ -168,20 +170,25 @@ func getStringBetweenTags(str string, startTag string, endTag string) (result st
 	return str[s:e]
 }
 
-func getCurrentTemp(str []string) string {
-	var returnedStr = ""
-	var i = 0
-	var stopAt = 0
-	for _, substr := range str {
-		if substr == "°F" {
-			stopAt += i
-			stopAt++
-		}
-		i++
-	}
-	returnedStr = strings.Join(str[6:8], " ")
+func getCurrentTemp(in string) string {
 
-	return returnedStr
+	degreeRuneIndex := strings.IndexRune(in, '°')
+	var spacesFound int
+	var tempValue string
+	for i := degreeRuneIndex; i >= 0; i-- {
+		if in[i] == ' ' {
+			spacesFound++
+		}
+		if spacesFound == 2 {
+			// Offset where we found the space by 1 and where we have our degree rune index by 1 to trim the spaces we know about
+			tempValue = in[i+1 : degreeRuneIndex-1]
+		}
+	}
+
+	spaceRuneIndex := strings.IndexRune(in[degreeRuneIndex:], ' ')
+	tempUnits := in[degreeRuneIndex:(degreeRuneIndex + spaceRuneIndex)]
+
+	return tempValue + " " + tempUnits
 }
 
 func getCurrentWeatherCondition(str string) (condition string) {
