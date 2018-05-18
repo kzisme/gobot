@@ -85,6 +85,7 @@ func addQuote(db *storm.DB, username string, quotedText string, sentAt time.Time
 	if err != nil {
 		log.Fatal("Failed to save")
 	}
+
 	return nil
 }
 
@@ -114,7 +115,6 @@ func fetchWeatherForLocation(db *storm.DB, username string, message string, con 
 		con.Privmsg(chanName, username+" It doesn't look like you have configured a location - please add a location with command .weather ~San Francisco~")
 	} else {
 		// Username exists...grab city and pipe into query and return
-
 		resp, err := http.Get("http://wttr.in/~" + weatherQuery.City + "?0TQ")
 		if err != nil {
 			fmt.Println(weatherQuery.City)
@@ -148,6 +148,7 @@ func addWeatherLocation(db *storm.DB, username string, message string, con *irc.
 		if err != nil {
 			log.Fatal("Failed to save")
 		}
+		con.Privmsg(chanName, "You have successfully configured your location!")
 	}
 }
 
