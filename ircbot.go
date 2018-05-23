@@ -28,6 +28,14 @@ type Weather struct {
 	City     string
 }
 
+type LoggedMessage struct {
+	ID       int `storm:"id,increment=0"`
+	Channel  string
+	Username string
+	Message  string
+	SentAt   string
+}
+
 var supportedCommands = []string{
 	".quote",
 	".addquote",
@@ -72,10 +80,21 @@ func main() {
 			case ".addweather":
 				addWeatherLocation(db, e.Nick, e.Message(), con)
 			}
+		} else {
+			logMessage(db, e.Nick, chanName, e.Message(), time.Now())
 		}
 	})
 
 	con.Loop()
+}
+
+func logMessage(db *storm.DB, username string, chanName string, message string, sentAt time.Time) {
+	logInsert := LoggedMessage{Channel: chanName, Username: username, Message: message, SentAt: sentAt.Format("01-02-2006")}
+
+	err := db.Save(&logInsert)
+	if err != nil {
+		log.Fatal("Failed to save")
+	}
 }
 
 func addQuote(db *storm.DB, username string, quotedText string, sentAt time.Time) error {
