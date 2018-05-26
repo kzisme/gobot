@@ -67,6 +67,10 @@ func main() {
 		con.Privmsg(chanName, "Join Message...")
 	})
 
+	con.AddCallback("INVITE", func(e *irc.Event) {
+		con.Join(e.Arguments[1])
+	})
+
 	// Add general logging (messages without commands)
 	con.AddCallback("PRIVMSG", func(e *irc.Event) {
 		if containsCommand(supportedCommands, strings.Fields(e.Message())[0]) {
@@ -81,6 +85,7 @@ func main() {
 				addWeatherLocation(db, e.Nick, e.Message(), con)
 			}
 		} else {
+			//TODO: Get multi-channel logging working
 			logMessage(db, e.Nick, chanName, e.Message(), time.Now())
 		}
 	})
