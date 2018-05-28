@@ -13,8 +13,6 @@ import (
 	"github.com/thoj/go-ircevent"
 )
 
-var chanName = "#redlight"
-
 type Quote struct {
 	ID         int `storm:"id,increment=0"`
 	Username   string
@@ -60,11 +58,11 @@ func main() {
 	defer db.Close()
 
 	con.AddCallback("001", func(e *irc.Event) {
-		con.Join(chanName)
+		con.Join(e.Arguments[0])
 	})
 
 	con.AddCallback("JOIN", func(e *irc.Event) {
-		con.Privmsg(chanName, "Join Message...")
+		con.Privmsg(e.Arguments[0], "Join Message...")
 	})
 
 	con.AddCallback("INVITE", func(e *irc.Event) {
@@ -76,17 +74,17 @@ func main() {
 		if containsCommand(supportedCommands, strings.Fields(e.Message())[0]) {
 			switch strings.Fields(e.Message())[0] {
 			case ".quote":
-				findSingleQuote(db, con)
+				findSingleQuote(e.Arguments[0], db, con)
 			case ".addquote":
 				addQuote(db, e.Nick, e.Message(), time.Now())
 			case ".weather":
-				fetchWeatherForLocation(db, e.Nick, e.Message(), con)
+				fetchWeatherForLocation(e.Arguments[0], db, e.Nick, e.Message(), con)
 			case ".addweather":
-				addWeatherLocation(db, e.Nick, e.Message(), con)
+				addWeatherLocation(e.Arguments[0], db, e.Nick, e.Message(), con)
 			}
 		} else {
 			//TODO: Get multi-channel logging working
-			logMessage(db, e.Nick, chanName, e.Message(), time.Now())
+			logMessage(db, e.Nick, e.Arguments[0], e.Message(), time.Now())
 		}
 	})
 
@@ -113,7 +111,7 @@ func addQuote(db *storm.DB, username string, quotedText string, sentAt time.Time
 	return nil
 }
 
-func findSingleQuote(db *storm.DB, con *irc.Connection) {
+func findSingleQuote(channel string, db *storm.DB, con *irc.Connection) {
 	var quoteQuery Quote
 
 	quoteCount, err := db.Count(&quoteQuery)
@@ -126,17 +124,17 @@ func findSingleQuote(db *storm.DB, con *irc.Connection) {
 		} else {
 			fmt.Println(err)
 
-			con.Privmsg(chanName, "Quote added by: "+quoteQuery.Username+" : "+"On "+quoteQuery.SentAt.Format("01-02-2006")+" ~ "+strings.Join(strings.Fields(quoteQuery.QuotedText)[1:], " "))
+			con.Privmsg(channel, "Quote added by: "+quoteQuery.Username+" : "+"On "+quoteQuery.SentAt.Format("01-02-2006")+" ~ "+strings.Join(strings.Fields(quoteQuery.QuotedText)[1:], " "))
 		}
 	}
 }
 
-func fetchWeatherForLocation(db *storm.DB, username string, message string, con *irc.Connection) {
+func fetchWeatherForLocation(channel string, db *storm.DB, username string, message string, con *irc.Connection) {
 	var weatherQuery Weather
 	err := db.One("Username", username, &weatherQuery)
 
 	if err != nil || weatherQuery.Username == " " {
-		con.Privmsg(chanName, username+" It doesn't look like you have configured a location - please add a location with command .weather ~San Francisco~")
+		con.Privmsg(channel, username+" It doesn't look like you have configured a location - please add a location with command .weather ~San Francisco~")
 	} else {
 		// Username exists...grab city and pipe into query and return
 		resp, err := http.Get("http://wttr.in/~" + weatherQuery.City + "?0TQ")
@@ -155,12 +153,12 @@ func fetchWeatherForLocation(db *storm.DB, username string, message string, con 
 
 			var responseString = getStringBetweenTags(bodyString, "<pre>", "</pre>")
 
-			con.Privmsg(chanName, weatherQuery.Username+" "+"-"+" "+" It Is currently"+" "+getCurrentWeatherCondition(responseString)+" "+"and"+" "+getCurrentTemp(responseString)+" "+"in"+" "+weatherQuery.City)
+			con.Privmsg(channel, weatherQuery.Username+" "+"-"+" "+" The current weather condition is"+" "+getCurrentWeatherCondition(responseString)+" "+"and"+" "+getCurrentTemp(responseString)+" "+"in"+" "+weatherQuery.City)
 		}
 	}
 }
 
-func addWeatherLocation(db *storm.DB, username string, message string, con *irc.Connection) {
+func addWeatherLocation(channel string, db *storm.DB, username string, message string, con *irc.Connection) {
 	if strings.Contains(message, "~") {
 		locationString := strings.Split(message, "~")
 		weatherConfig := Weather{Username: username, City: locationString[1]}
@@ -172,7 +170,7 @@ func addWeatherLocation(db *storm.DB, username string, message string, con *irc.
 		if err != nil {
 			log.Fatal("Failed to save")
 		}
-		con.Privmsg(chanName, "You have successfully configured your location!")
+		con.Privmsg(channel, "You have successfully configured your location!")
 	}
 }
 
@@ -220,6 +218,7 @@ func getCurrentWeatherCondition(str string) (condition string) {
 	// Maybe find unicode/emoji chars and build this []string into a struct of some sort?
 	conditions := []string{"Clear",
 		"Sunny",
+		"Haze",
 		"Partly cloudy",
 		"Cloudy",
 		"Overcast",
