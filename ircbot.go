@@ -39,12 +39,13 @@ var supportedCommands = []string{
 	".addquote",
 	".weather",
 	".addweather",
+	".seen",
 }
 
 func main() {
 
 	con := irc.IRC("BotName", "BotName")
-	err := con.Connect("irc.crushandrun.net:6667")
+	err := con.Connect("irc.freenode.net:6667")
 	if err != nil {
 		fmt.Println("Connection Failed")
 		return
@@ -81,14 +82,39 @@ func main() {
 				fetchWeatherForLocation(e.Arguments[0], db, e.Nick, e.Message(), con)
 			case ".addweather":
 				addWeatherLocation(e.Arguments[0], db, e.Nick, e.Message(), con)
+			case ".seen":
+				findUserLastSeen(e.Message(), e.Arguments[0], db, con)
 			}
 		} else {
-			//TODO: Get multi-channel logging working
 			logMessage(db, e.Nick, e.Arguments[0], e.Message(), time.Now())
 		}
 	})
 
 	con.Loop()
+}
+
+func findUserLastSeen(userToFind string, channel string, db *storm.DB, con *irc.Connection) {
+	var userLastSeen []LoggedMessage
+
+	if len(strings.Fields(userToFind)) == 2 {
+		err := db.Find("Username", strings.Join(strings.Fields(userToFind)[1:2], " "), &userLastSeen, storm.Reverse(), storm.Limit(1))
+		if err != nil {
+
+			fmt.Println(err)
+			con.Privmsg(channel, "User Not Found...")
+
+		} else {
+			t, err := time.Parse("01-02-2006", userLastSeen[0].SentAt)
+
+			if err != nil {
+				fmt.Println(err)
+			}
+
+			con.Privmsg(channel, "User: "+userLastSeen[0].Username+" "+"was seen on"+" "+t.Format("01-02-2006")+" "+"Message:"+" "+userLastSeen[0].Message)
+		}
+	} else {
+		con.Privmsg(channel, "Unknown syntax - Please use the following syntax: '.seen username'")
+	}
 }
 
 func logMessage(db *storm.DB, username string, chanName string, message string, sentAt time.Time) {
