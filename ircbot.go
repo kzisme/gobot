@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"html"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -40,12 +41,14 @@ var supportedCommands = []string{
 	".weather",
 	".addweather",
 	".seen",
+	".test",
 }
 
 func main() {
 
+	go RunWebServer()
 	con := irc.IRC("BotName", "BotName")
-	err := con.Connect("irc.freenode.net:6667")
+	err := con.Connect("irc.crushandrun.net:6667")
 	if err != nil {
 		fmt.Println("Connection Failed")
 		return
@@ -84,6 +87,8 @@ func main() {
 				addWeatherLocation(e.Arguments[0], db, e.Nick, e.Message(), con)
 			case ".seen":
 				findUserLastSeen(e.Message(), e.Arguments[0], db, con)
+			case ".test":
+				fmt.Printf("%s", e.Tags)
 			}
 		} else {
 			logMessage(db, e.Nick, e.Arguments[0], e.Message(), time.Now())
@@ -91,6 +96,16 @@ func main() {
 	})
 
 	con.Loop()
+
+}
+
+func RunWebServer() {
+
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "Test, %q", html.EscapeString(r.URL.Path))
+	})
+	http.ListenAndServe(":8081", nil)
+
 }
 
 func findUserLastSeen(userToFind string, channel string, db *storm.DB, con *irc.Connection) {
