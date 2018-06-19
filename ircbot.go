@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
-	"html"
+	"html/template"
 	"io/ioutil"
 	"log"
 	"math/rand"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -101,11 +102,21 @@ func main() {
 
 func RunWebServer() {
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "Test, %q", html.EscapeString(r.URL.Path))
-	})
+	fs := http.FileServer(http.Dir("static"))
+	http.Handle("/static/", http.StripPrefix("/static/", fs))
+
+	http.HandleFunc("/", serveTemplate)
+
 	http.ListenAndServe(":8081", nil)
 
+}
+
+func serveTemplate(w http.ResponseWriter, r *http.Request) {
+	lp := filepath.Join("templates", "layout.html")
+	fp := filepath.Join("templates", filepath.Clean(r.URL.Path))
+
+	tmpl, _ := template.ParseFiles(lp, fp)
+	tmpl.ExecuteTemplate(w, "layout", nil)
 }
 
 func findUserLastSeen(userToFind string, channel string, db *storm.DB, con *irc.Connection) {
