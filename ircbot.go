@@ -7,7 +7,6 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -36,6 +35,10 @@ type LoggedMessage struct {
 	SentAt   string
 }
 
+type LogPageData struct {
+	Message []LoggedMessage
+}
+
 var supportedCommands = []string{
 	".quote",
 	".addquote",
@@ -47,6 +50,7 @@ var supportedCommands = []string{
 
 func main() {
 
+	// TODO: Fix this goroutine - when it is uncommented it now causes an immediate timeout when connecting to a server.
 	go RunWebServer()
 	con := irc.IRC("BotName", "BotName")
 	err := con.Connect("irc.crushandrun.net:6667")
@@ -97,26 +101,28 @@ func main() {
 	})
 
 	con.Loop()
-
 }
 
 func RunWebServer() {
+	db, err := storm.Open("my.db")
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	fs := http.FileServer(http.Dir("static"))
-	http.Handle("/static/", http.StripPrefix("/static/", fs))
+	defer db.Close()
 
-	http.HandleFunc("/", serveTemplate)
+	tmpl := template.Must(template.ParseFiles("templates/layout.html"))
+
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		var loggedMessages []LoggedMessage
+
+		db.AllByIndex("SentAt", &loggedMessages)
+
+		tmpl.Execute(w, loggedMessages)
+
+	})
 
 	http.ListenAndServe(":8081", nil)
-
-}
-
-func serveTemplate(w http.ResponseWriter, r *http.Request) {
-	lp := filepath.Join("templates", "layout.html")
-	fp := filepath.Join("templates", filepath.Clean(r.URL.Path))
-
-	tmpl, _ := template.ParseFiles(lp, fp)
-	tmpl.ExecuteTemplate(w, "layout", nil)
 }
 
 func findUserLastSeen(userToFind string, channel string, db *storm.DB, con *irc.Connection) {

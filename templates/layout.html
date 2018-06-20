@@ -3,11 +3,13 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>{{template "title"}}</title>
+  <title>Test</title>
   <link rel="stylesheet" href="/static/stylesheets/main.css">
 </head>
-<body>
-  {{template "body"}}
-</body>
+<ul>
+  {{range .LoggedMessage}}
+  <li>{{.Message}}</li>
+  {{end}}
+</ul>
 </html>
 {{end}}
