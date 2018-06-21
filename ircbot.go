@@ -49,22 +49,20 @@ var supportedCommands = []string{
 }
 
 func main() {
+	db, err := storm.Open("my.db")
+	if err != nil {
+		log.Fatal("DB Error: " + err.Error())
+	}
 
-	// TODO: Fix this goroutine - when it is uncommented it now causes an immediate timeout when connecting to a server.
-	go RunWebServer()
+	defer db.Close()
+	go RunWebServer(db)
+
 	con := irc.IRC("BotName", "BotName")
-	err := con.Connect("irc.crushandrun.net:6667")
+	err = con.Connect("irc.freenode.net:6667")
 	if err != nil {
 		fmt.Println("Connection Failed")
 		return
 	}
-
-	db, err := storm.Open("my.db")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	defer db.Close()
 
 	con.AddCallback("001", func(e *irc.Event) {
 		con.Join(e.Arguments[0])
@@ -103,23 +101,16 @@ func main() {
 	con.Loop()
 }
 
-func RunWebServer() {
-	db, err := storm.Open("my.db")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	defer db.Close()
-
+func RunWebServer(db *storm.DB) {
 	tmpl := template.Must(template.ParseFiles("templates/layout.html"))
 
+	//TODO: Handle errors from this
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		var loggedMessages []LoggedMessage
 
 		db.AllByIndex("SentAt", &loggedMessages)
 
 		tmpl.Execute(w, loggedMessages)
-
 	})
 
 	http.ListenAndServe(":8081", nil)
