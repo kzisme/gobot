@@ -35,10 +35,6 @@ type LoggedMessage struct {
 	SentAt   string
 }
 
-type LogPageData struct {
-	Message []LoggedMessage
-}
-
 var supportedCommands = []string{
 	".quote",
 	".addquote",
@@ -108,7 +104,12 @@ func RunWebServer(db *storm.DB) {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		var loggedMessages []LoggedMessage
 
-		db.AllByIndex("SentAt", &loggedMessages)
+		err := db.All(&loggedMessages)
+		if err != nil {
+			log.Fatal("Handle Func DB Error: " + err.Error())
+		}
+
+		fmt.Println(len(loggedMessages))
 
 		tmpl.Execute(w, loggedMessages)
 	})

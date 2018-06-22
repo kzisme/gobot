@@ -1,4 +1,3 @@
-{{define "layout"}}
 <!doctype html>
 <html>
 <head>
@@ -7,9 +6,8 @@
   <link rel="stylesheet" href="/static/stylesheets/main.css">
 </head>
 <ul>
-  {{range .LoggedMessage}}
-  <li>{{.Message}}</li>
+  {{range .}}
+    <li>{{.Channel}} {{.Username}} {{.Message}}</li>
   {{end}}
 </ul>
 </html>
-{{end}}
