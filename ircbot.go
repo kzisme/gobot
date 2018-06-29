@@ -109,8 +109,6 @@ func RunWebServer(db *storm.DB) {
 			log.Fatal("Handle Func DB Error: " + err.Error())
 		}
 
-		fmt.Println(len(loggedMessages))
-
 		tmpl.Execute(w, loggedMessages)
 	})
 
