@@ -5,9 +5,16 @@
   <title>Test</title>
   <link rel="stylesheet" href="/static/stylesheets/main.css">
 </head>
-<ul>
+<table>
+  <th>Channel</th>
+  <th>Username</th>
+  <th align ="left">Message</th>
   {{range .}}
-    <li>{{.Channel}} {{.Username}} {{.Message}}</li>
+  <tr>
+    <td>{{.Channel}}</td>
+    <td>{{.Username}}</td>
+    <td>{{.Message}}</td>
+  </tr>
   {{end}}
-</ul>
+</table>
 </html>
