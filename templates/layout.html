@@ -6,11 +6,13 @@
   <link rel="stylesheet" href="/static/stylesheets/main.css">
 </head>
 <table>
+  <th>Sent At</th>
   <th>Channel</th>
   <th>Username</th>
   <th align ="left">Message</th>
   {{range .}}
   <tr>
+    <td>{{.SentAt}}</td>
     <td>{{.Channel}}</td>
     <td>{{.Username}}</td>
     <td>{{.Message}}</td>
