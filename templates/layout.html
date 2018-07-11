@@ -5,13 +5,14 @@
   <title>Test</title>
   <link rel="stylesheet" href="/static/stylesheets/main.css">
 </head>
-<table>
+<input type="text" id="search" placeholder="Type to search">
+<table id="messagesTable">
   <th>Sent At</th>
   <th>Channel</th>
   <th>Username</th>
   <th align ="left">Message</th>
   {{range .}}
-  <tr>
+  <tr id="tableHeader">
     <td>{{.SentAt}}</td>
     <td>{{.Channel}}</td>
     <td>{{.Username}}</td>
@@ -19,4 +20,20 @@
   </tr>
   {{end}}
 </table>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+<script>
+var $rows = $('#messagesTable tbody tr');
+$('#search').keyup(function() {
+  var val = $.trim($(this).val()).replace(/ +/g, ' ').toLowerCase().split(' ');
+
+  $rows.hide().filter(function() {
+    var text = $(this).text().replace(/\s+/g, ' ').toLowerCase();
+    var matchesSearch = true;
+    $(val).each(function(index, value) {
+      matchesSearch = (!matchesSearch) ? false : ~text.indexOf(value);
+    });
+    return matchesSearch;
+  }).show();
+});   
+</script>
 </html>
