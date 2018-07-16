@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -45,6 +46,15 @@ var supportedCommands = []string{
 }
 
 func main() {
+
+	//TODO: Add a nick setting
+	serverSetting := flag.String("Server", "irc.freenode.net", "Provide an IRC server to connect to.")
+	portSetting := flag.Int("Port", 6667, "6667")
+
+	flag.Parse()
+
+	fmt.Println(fmt.Sprintf("%s%s%d", *serverSetting, ":", *portSetting))
+
 	db, err := storm.Open("my.db")
 	if err != nil {
 		log.Fatal("DB Error: " + err.Error())
@@ -54,7 +64,7 @@ func main() {
 	go RunWebServer(db)
 
 	con := irc.IRC("BotName", "BotName")
-	err = con.Connect("irc.freenode.net:6667")
+	err = con.Connect(fmt.Sprintf("%s%s%d", *serverSetting, ":", *portSetting))
 	if err != nil {
 		fmt.Println("Connection Failed")
 		return
