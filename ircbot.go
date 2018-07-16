@@ -53,8 +53,6 @@ func main() {
 
 	flag.Parse()
 
-	fmt.Println(fmt.Sprintf("%s%s%d", *serverSetting, ":", *portSetting))
-
 	db, err := storm.Open("my.db")
 	if err != nil {
 		log.Fatal("DB Error: " + err.Error())
