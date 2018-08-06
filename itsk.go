@@ -42,7 +42,6 @@ var supportedCommands = []string{
 	".weather",
 	".addweather",
 	".seen",
-	".test",
 }
 
 func main() {
@@ -94,8 +93,6 @@ func main() {
 				addWeatherLocation(e.Arguments[0], db, e.Nick, e.Message(), con)
 			case ".seen":
 				findUserLastSeen(e.Message(), e.Arguments[0], db, con)
-			case ".test":
-				fmt.Printf("%s", e.Tags)
 			}
 		} else {
 			logMessage(db, e.Nick, e.Arguments[0], e.Message(), time.Now())
