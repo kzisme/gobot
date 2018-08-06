@@ -61,7 +61,7 @@ func main() {
 	defer db.Close()
 	go RunWebServer(db)
 
-	con := irc.IRC("BotName", "BotName")
+	con := irc.IRC("Itsk", "Itsk")
 	err = con.Connect(fmt.Sprintf("%s%s%d", *serverSetting, ":", *portSetting))
 	if err != nil {
 		fmt.Println("Connection Failed")
