@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/subtle"
 	"flag"
 	"fmt"
 	"html/template"
@@ -105,8 +106,9 @@ func main() {
 func RunWebServer(db *storm.DB) {
 	tmpl := template.Must(template.ParseFiles("templates/layout.html"))
 
-	//TODO: Handle errors from this
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	sensitive := func(w http.ResponseWriter, r *http.Request) {
+		//TODO: Handle errors from this
+
 		var loggedMessages []LoggedMessage
 
 		err := db.All(&loggedMessages)
@@ -115,9 +117,27 @@ func RunWebServer(db *storm.DB) {
 		}
 
 		tmpl.Execute(w, loggedMessages)
-	})
+	}
+
+	http.HandleFunc("/", BasicAuth(sensitive, "username", "password", "Please enter your username and password for this site."))
 
 	http.ListenAndServe(":8081", nil)
+}
+
+func BasicAuth(handler http.HandlerFunc, username, password, realm string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		user, pass, ok := r.BasicAuth()
+
+		if !ok || subtle.ConstantTimeCompare([]byte(user), []byte(username)) != 1 || subtle.ConstantTimeCompare([]byte(pass), []byte(password)) != 1 {
+			w.Header().Set("WWW-Authenticate", `Basic realm="`+realm+`"`)
+			w.WriteHeader(401)
+			w.Write([]byte("Unauthorised.\n"))
+			return
+		}
+
+		handler(w, r)
+	}
 }
 
 func findUserLastSeen(userToFind string, channel string, db *storm.DB, con *irc.Connection) {
@@ -187,7 +207,7 @@ func fetchWeatherForLocation(channel string, db *storm.DB, username string, mess
 	err := db.One("Username", username, &weatherQuery)
 
 	if err != nil || weatherQuery.Username == " " {
-		con.Privmsg(channel, username+" It doesn't look like you have configured a location - please add a location with command .weather ~San Francisco~")
+		con.Privmsg(channel, username+" It doesn't look like you have configured a location - please add a location with command .addweather ~San Francisco~")
 	} else {
 		// Username exists...grab city and pipe into query and return
 		resp, err := http.Get("http://wttr.in/~" + weatherQuery.City + "?0TQ")
