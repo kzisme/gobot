@@ -9,6 +9,8 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -43,9 +45,22 @@ var supportedCommands = []string{
 	".weather",
 	".addweather",
 	".seen",
+	".uptime",
 }
 
 func main() {
+	startTime := time.Now()
+
+	log.Println("Starting...")
+	CreateLogDirIfNotExists(".log/")
+	file, e := os.OpenFile(".log/log.txt", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if e != nil {
+		log.Fatal("Log setup failed")
+	}
+
+	defer file.Close()
+
+	log.SetOutput(file)
 
 	//TODO: Add a nick setting
 	serverSetting := flag.String("Server", "irc.freenode.net", "Provide an IRC server to connect to.")
@@ -53,9 +68,11 @@ func main() {
 
 	flag.Parse()
 
+	log.Println("Test Logging")
+
 	db, err := storm.Open("my.db")
 	if err != nil {
-		log.Fatal("DB Error: " + err.Error())
+		log.Println("DB Error: " + err.Error())
 	}
 
 	defer db.Close()
@@ -64,7 +81,7 @@ func main() {
 	con := irc.IRC("Itsk", "Itsk")
 	err = con.Connect(fmt.Sprintf("%s%s%d", *serverSetting, ":", *portSetting))
 	if err != nil {
-		fmt.Println("Connection Failed")
+		log.Println("Connection Failed")
 		return
 	}
 
@@ -94,6 +111,8 @@ func main() {
 				addWeatherLocation(e.Arguments[0], db, e.Nick, e.Message(), con)
 			case ".seen":
 				findUserLastSeen(e.Message(), e.Arguments[0], db, con)
+			case ".uptime":
+				getCurrentUptime(e.Arguments[0], con, startTime)
 			}
 		} else {
 			logMessage(db, e.Nick, e.Arguments[0], e.Message(), time.Now())
@@ -103,7 +122,17 @@ func main() {
 	con.Loop()
 }
 
+func CreateLogDirIfNotExists(dir string) {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		err = os.MkdirAll(dir, 0755)
+		if err != nil {
+			panic(err)
+		}
+	}
+}
+
 func RunWebServer(db *storm.DB) {
+	log.Println("Running Web Server...")
 	tmpl := template.Must(template.ParseFiles("templates/layout.html"))
 
 	sensitive := func(w http.ResponseWriter, r *http.Request) {
@@ -147,14 +176,14 @@ func findUserLastSeen(userToFind string, channel string, db *storm.DB, con *irc.
 		err := db.Find("Username", strings.Join(strings.Fields(userToFind)[1:2], " "), &userLastSeen, storm.Reverse(), storm.Limit(1))
 		if err != nil {
 
-			fmt.Println(err)
+			log.Println(err)
 			con.Privmsg(channel, "User Not Found...")
 
 		} else {
 			t, err := time.Parse("01-02-2006", userLastSeen[0].SentAt)
 
 			if err != nil {
-				fmt.Println(err)
+				log.Println(err)
 			}
 
 			con.Privmsg(channel, "User: "+userLastSeen[0].Username+" "+"was seen on"+" "+t.Format("01-02-2006")+" "+"Message:"+" "+userLastSeen[0].Message)
@@ -169,7 +198,7 @@ func logMessage(db *storm.DB, username string, chanName string, message string, 
 
 	err := db.Save(&logInsert)
 	if err != nil {
-		log.Fatal("Failed to save")
+		log.Println("Failed to save")
 	}
 }
 
@@ -178,7 +207,7 @@ func addQuote(db *storm.DB, username string, quotedText string, sentAt time.Time
 
 	err := db.Save(&dbInsert)
 	if err != nil {
-		log.Fatal("Failed to save")
+		log.Println("Failed to save")
 	}
 
 	return nil
@@ -193,9 +222,9 @@ func findSingleQuote(channel string, db *storm.DB, con *irc.Connection) {
 
 		err := db.One("ID", randomID, &quoteQuery)
 		if err != nil {
-			log.Fatal("Query Error Occured")
+			log.Println("Query Error Occured")
 		} else {
-			fmt.Println(err)
+			log.Println(err)
 
 			con.Privmsg(channel, "Quote added by: "+quoteQuery.Username+" : "+"On "+quoteQuery.SentAt.Format("01-02-2006")+" ~ "+strings.Join(strings.Fields(quoteQuery.QuotedText)[1:], " "))
 		}
@@ -212,9 +241,9 @@ func fetchWeatherForLocation(channel string, db *storm.DB, username string, mess
 		// Username exists...grab city and pipe into query and return
 		resp, err := http.Get("http://wttr.in/~" + weatherQuery.City + "?0TQ")
 		if err != nil {
-			fmt.Println(weatherQuery.City)
+			log.Println(weatherQuery.City)
 
-			log.Fatal(err.Error())
+			log.Println(err.Error())
 		}
 
 		defer resp.Body.Close()
@@ -236,12 +265,12 @@ func addWeatherLocation(channel string, db *storm.DB, username string, message s
 		locationString := strings.Split(message, "~")
 		weatherConfig := Weather{Username: username, City: locationString[1]}
 
-		fmt.Println(weatherConfig)
+		log.Println(weatherConfig)
 
 		//Fix this for updates if user already exists
 		err := db.Save(&weatherConfig)
 		if err != nil {
-			log.Fatal("Failed to save")
+			log.Println("Failed to save - addWeatherLocation")
 		}
 		con.Privmsg(channel, "You have successfully configured your location!")
 	}
@@ -254,6 +283,14 @@ func containsCommand(s []string, e string) bool {
 		}
 	}
 	return false
+}
+
+func getCurrentUptime(channel string, con *irc.Connection, upTime time.Time) {
+	year, month, day, hour, min, sec := uptimeDiff(upTime, time.Now())
+
+	// TODO: Try to find a way to nicely format this using fmt.Printf - or make it look nicer on output.
+	con.Privmsg(channel, "I have been running for: "+strconv.Itoa(year)+"years,"+strconv.Itoa(month)+",months"+strconv.Itoa(day)+",days"+strconv.Itoa(hour)+",hours"+strconv.Itoa(min)+",minutes"+
+		strconv.Itoa(sec)+",seconds.")
 }
 
 func getStringBetweenTags(str string, startTag string, endTag string) (result string) {
@@ -285,6 +322,53 @@ func getCurrentTemp(in string) string {
 	tempUnits := in[degreeRuneIndex:(degreeRuneIndex + spaceRuneIndex)]
 
 	return tempValue + " " + tempUnits
+}
+
+func uptimeDiff(a, b time.Time) (year, month, day, hour, min, sec int) {
+	if a.Location() != b.Location() {
+		b = b.In(a.Location())
+	}
+	if a.After(b) {
+		a, b = b, a
+	}
+	y1, M1, d1 := a.Date()
+	y2, M2, d2 := b.Date()
+
+	h1, m1, s1 := a.Clock()
+	h2, m2, s2 := b.Clock()
+
+	year = int(y2 - y1)
+	month = int(M2 - M1)
+	day = int(d2 - d1)
+	hour = int(h2 - h1)
+	min = int(m2 - m1)
+	sec = int(s2 - s1)
+
+	// Normalize negative values
+	if sec < 0 {
+		sec += 60
+		min--
+	}
+	if min < 0 {
+		min += 60
+		hour--
+	}
+	if hour < 0 {
+		hour += 24
+		day--
+	}
+	if day < 0 {
+		// days in month:
+		t := time.Date(y1, M1, 32, 0, 0, 0, 0, time.UTC)
+		day += 32 - t.Day()
+		month--
+	}
+	if month < 0 {
+		month += 12
+		year--
+	}
+
+	return
 }
 
 func getCurrentWeatherCondition(str string) (condition string) {
