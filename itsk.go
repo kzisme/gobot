@@ -68,8 +68,6 @@ func main() {
 
 	flag.Parse()
 
-	log.Println("Test Logging")
-
 	db, err := storm.Open("my.db")
 	if err != nil {
 		log.Println("DB Error: " + err.Error())
@@ -148,9 +146,10 @@ func RunWebServer(db *storm.DB) {
 		tmpl.Execute(w, loggedMessages)
 	}
 
+	//TODO: If re-deploying change the user/pass - set this up to work as a parameter
 	http.HandleFunc("/", BasicAuth(sensitive, "username", "password", "Please enter your username and password for this site."))
 
-	http.ListenAndServe(":8081", nil)
+	http.ListenAndServe(":8080", nil)
 }
 
 func BasicAuth(handler http.HandlerFunc, username, password, realm string) http.HandlerFunc {
